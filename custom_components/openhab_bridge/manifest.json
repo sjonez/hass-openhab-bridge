@@ -1,0 +1,12 @@
+{
+  "domain": "openhab_bridge",
+  "name": "openHAB Bridge",
+  "codeowners": ["@sjonez"],
+  "config_flow": true,
+  "documentation": "https://github.com/sjonez/hass-openhab-bridge",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/sjonez/hass-openhab-bridge/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,0 +1,6 @@
+# Normalise to LF in the repository. Without this, committing from Windows
+# can store CRLF and produce noisy diffs for everyone else.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary

@@ -1,0 +1,9 @@
+.venv/
+# Local openHAB credentials for scripts/smoke_test.py -- never commit.
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/

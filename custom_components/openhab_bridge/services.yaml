@@ -1,0 +1,48 @@
+get_item_state:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: openhab_bridge
+    item:
+      required: true
+      example: Kitchen_Light
+      selector:
+        text:
+
+post_update:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: openhab_bridge
+    item:
+      required: true
+      example: Kitchen_Light
+      selector:
+        text:
+    state:
+      required: true
+      example: "ON"
+      selector:
+        text:
+
+send_command:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: openhab_bridge
+    item:
+      required: true
+      example: Kitchen_Light
+      selector:
+        text:
+    command:
+      required: true
+      example: "ON"
+      selector:
+        text:

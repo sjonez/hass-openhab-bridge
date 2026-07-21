@@ -1,0 +1,241 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to openHAB",
+        "description": "Enter the address of your openHAB server and an API token. Create a token in openHAB under Settings → API Tokens.",
+        "data": {
+          "base_url": "openHAB URL",
+          "token": "API token",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "base_url": "For example http://openhab.local:8080"
+        }
+      },
+      "reauth_confirm": {
+        "title": "openHAB rejected the API token",
+        "description": "Enter a new API token for {url}.",
+        "data": {
+          "token": "API token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach openHAB at that address.",
+      "invalid_auth": "openHAB rejected the API token."
+    },
+    "abort": {
+      "already_configured": "That openHAB server is already configured.",
+      "reauth_successful": "Reconnected to openHAB with the new token."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "openHAB Bridge",
+        "description": "Manage the openHAB items exposed to Home Assistant.",
+        "menu_options": {
+          "add_items": "Add items",
+          "edit_item": "Edit an item",
+          "remove_items": "Remove items",
+          "connection": "Connection settings"
+        }
+      },
+      "add_items": {
+        "title": "Add openHAB items",
+        "description": "Choose the items to expose as Home Assistant entities. Only items that are not already exposed are listed.",
+        "data": {
+          "items": "Items"
+        }
+      },
+      "add_types": {
+        "title": "Choose entity types",
+        "description": "Each item is pre-set to the closest matching entity type. Change any you would like to expose differently.",
+        "data": {}
+      },
+      "edit_item": {
+        "title": "Edit an item",
+        "description": "Choose which exposed item to change.",
+        "data": {
+          "item": "Item"
+        }
+      },
+      "edit_details": {
+        "title": "Edit {item}",
+        "description": "openHAB type: {item_type}. The label in openHAB is “{label}”. Leave the name override empty to keep using the openHAB label.",
+        "data": {
+          "platform": "Entity type",
+          "name": "Name override"
+        }
+      },
+      "remove_items": {
+        "title": "Remove items",
+        "description": "Selected items will stop being exposed and their entities will be removed.",
+        "data": {
+          "items": "Items to remove"
+        }
+      },
+      "connection": {
+        "title": "Connection settings",
+        "description": "Change how Home Assistant reaches openHAB. Your exposed items are left untouched.",
+        "data": {
+          "base_url": "openHAB URL",
+          "token": "API token",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach openHAB at that address.",
+      "invalid_auth": "openHAB rejected the API token."
+    },
+    "abort": {
+      "cannot_connect": "Could not reach openHAB to load the item list.",
+      "invalid_auth": "openHAB rejected the API token.",
+      "no_items_available": "Every openHAB item is already exposed.",
+      "nothing_selected": "No items were selected."
+    }
+  },
+  "issues": {
+    "item_missing": {
+      "title": "openHAB item “{item}” no longer exists",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "openHAB item “{item}” is gone",
+            "description": "This item is no longer present in openHAB. If it was renamed, re-map it so the Home Assistant entity keeps its history and stays working in your automations. Otherwise, remove it.",
+            "menu_options": {
+              "remap": "Re-map to a different item",
+              "remove": "Remove from Home Assistant"
+            }
+          },
+          "remap": {
+            "title": "Re-map “{item}”",
+            "description": "Search for the openHAB item that replaces it, by name or label. Narrow the search until it matches {limit} items or fewer.",
+            "data": {
+              "search": "Search"
+            }
+          },
+          "remap_pick": {
+            "title": "Replace “{item}” with",
+            "description": "The existing entity keeps its ID and history, so automations and dashboards carry on working.",
+            "data": {
+              "new_item": "Replacement item"
+            }
+          }
+        },
+        "error": {
+          "no_matches": "No unexposed openHAB item matches that. Try part of the item name or its label.",
+          "too_many_matches": "Too many matches to show. Try a more specific search."
+        },
+        "abort": {
+          "entry_gone": "That openHAB Bridge entry no longer exists.",
+          "cannot_connect": "Could not reach openHAB to load the item list."
+        }
+      }
+    },
+    "type_mismatch": {
+      "title": "openHAB item “{item}” changed type",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "“{item}” changed type",
+            "description": "The item is now a {item_type} in openHAB, which the current entity type can no longer represent. Choose an entity type that fits.",
+            "data": {
+              "platform": "Entity type"
+            }
+          }
+        },
+        "abort": {
+          "entry_gone": "That openHAB Bridge entry no longer exists."
+        }
+      }
+    },
+    "parse_failures": {
+      "title": "openHAB item “{item}” is sending unusable values",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "“{item}” is sending unusable values",
+            "description": "This item keeps sending values the current entity type cannot interpret, such as “{value}”. Choose an entity type that fits.",
+            "data": {
+              "platform": "Entity type"
+            }
+          }
+        },
+        "abort": {
+          "entry_gone": "That openHAB Bridge entry no longer exists."
+        }
+      }
+    },
+    "unreachable": {
+      "title": "Cannot reach openHAB",
+      "description": "Home Assistant has been unable to reconnect to openHAB for some time. The last error was: {error}. Entities stay unavailable until the connection is restored; this will clear on its own once it is."
+    },
+    "websocket_unsupported": {
+      "title": "This openHAB has no event WebSocket",
+      "description": "The server at {entry_title} does not provide the /ws/events endpoint this integration needs for live updates. openHAB 4.0 or newer is required. There is no polling fallback."
+    },
+    "feedback_loop": {
+      "title": "Feedback loop on openHAB item “{item}”",
+      "description": "This item was commanded repeatedly in a short window, which normally means something is commanding it every time it changes — usually a Home Assistant automation or an openHAB rule. Outbound commands to this item are paused for a short period; incoming state from openHAB is unaffected. Review your automations and rules for “{item}”."
+    },
+    "commands_unconfirmed": {
+      "title": "openHAB item “{item}” is not acting on commands",
+      "description": "Commands sent to “{item}” are not resulting in any state change. This item has autoupdate disabled in openHAB, so its state only changes when the bound thing reports back — the thing is most likely offline or rejecting the command. This is not a fault in the connection to openHAB, and will clear once a command takes effect."
+    }
+  },
+  "services": {
+    "get_item_state": {
+      "name": "Get item state",
+      "description": "Reads the current state of any openHAB item, whether or not it is exposed as an entity.",
+      "fields": {
+        "config_entry_id": {
+          "name": "openHAB server",
+          "description": "Which openHAB server to query. Optional when only one is configured."
+        },
+        "item": {
+          "name": "Item",
+          "description": "The openHAB item name."
+        }
+      }
+    },
+    "post_update": {
+      "name": "Post update",
+      "description": "Writes an item state directly in openHAB, without asking the bound thing to act.",
+      "fields": {
+        "config_entry_id": {
+          "name": "openHAB server",
+          "description": "Which openHAB server to use. Optional when only one is configured."
+        },
+        "item": {
+          "name": "Item",
+          "description": "The openHAB item name."
+        },
+        "state": {
+          "name": "State",
+          "description": "The new state, for example ON or 21.5."
+        }
+      }
+    },
+    "send_command": {
+      "name": "Send command",
+      "description": "Sends a command to an openHAB item, asking the bound thing to act. For items with autoupdate disabled the state only changes once the thing reports back.",
+      "fields": {
+        "config_entry_id": {
+          "name": "openHAB server",
+          "description": "Which openHAB server to use. Optional when only one is configured."
+        },
+        "item": {
+          "name": "Item",
+          "description": "The openHAB item name."
+        },
+        "command": {
+          "name": "Command",
+          "description": "The command to send, for example ON, OFF or 50."
+        }
+      }
+    }
+  }
+}
