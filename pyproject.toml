@@ -1,6 +1,11 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# Make `custom_components` importable however pytest is invoked. Running
+# `python -m pytest` happens to put the working directory on sys.path, but a
+# bare `pytest` does not -- so without this the suite passes locally and fails
+# on a clean checkout.
+pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py312"
