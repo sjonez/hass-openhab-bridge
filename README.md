@@ -312,6 +312,7 @@ Linux without any of them, and that remains the authoritative result.
    from source needs the MSVC build tools. Install with the pin overridden instead:
 
    ```
+   echo lru-dict==1.4.1 > overrides.txt
    .venv\Scripts\python -m pip install uv
    .venv\Scripts\python -m uv pip install -r requirements-test.txt --override overrides.txt
    ```

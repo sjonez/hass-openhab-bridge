@@ -7,3 +7,6 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+
+# Local-only: Windows lru-dict pin override, created on demand.
+overrides.txt
