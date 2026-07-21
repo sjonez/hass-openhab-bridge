@@ -18,6 +18,11 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          # No brand assets yet. HACS looks for
+          # custom_components/openhab_bridge/brand/icon.png first, then falls
+          # back to the home-assistant/brands repository. Remove this ignore
+          # once either exists.
+          ignore: brands
 
   test:
     runs-on: ubuntu-latest

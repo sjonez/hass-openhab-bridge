@@ -10,7 +10,7 @@
           "verify_ssl": "Verify SSL certificate"
         },
         "data_description": {
-          "base_url": "For example http://openhab.local:8080"
+          "base_url": "The address of your openHAB server, including the scheme and port"
         }
       },
       "reauth_confirm": {
