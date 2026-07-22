@@ -7,6 +7,9 @@ from typing import Any
 from urllib.parse import urlparse
 
 import voluptuous as vol
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.components.number import NumberDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -27,15 +30,21 @@ from homeassistant.helpers.selector import (
 
 from .api import OpenHabAuthError, OpenHabClient, OpenHabError, OpenHabItem
 from .const import (
+    ADVANCED_OVERRIDES_FOR,
     CONF_BASE_URL,
+    CONF_DEVICE_CLASS,
     CONF_ITEMS,
     CONF_NAME_OVERRIDE,
     CONF_PLATFORM,
+    CONF_STATE_CLASS,
     CONF_TOKEN,
+    CONF_UNIT_OVERRIDE,
     CONF_VERIFY_SSL,
     DOMAIN,
+    STEP_ADD_ADVANCED,
     STEP_ADD_ITEMS,
     STEP_CONNECTION,
+    STEP_EDIT_ADVANCED,
     STEP_EDIT_ITEM,
     STEP_REMOVE_ITEMS,
     allowed_platforms_for,
@@ -108,6 +117,94 @@ def _platform_selector(item: OpenHabItem | None) -> SelectSelector:
             mode=SelectSelectorMode.DROPDOWN,
         )
     )
+
+
+# The enum each override field picks from, keyed by (platform, config key).
+# device_class differs per platform; state_class only exists for sensor.
+_CLASS_ENUM: dict[tuple[str, str], type] = {
+    ("sensor", CONF_DEVICE_CLASS): SensorDeviceClass,
+    ("sensor", CONF_STATE_CLASS): SensorStateClass,
+    ("number", CONF_DEVICE_CLASS): NumberDeviceClass,
+    ("binary_sensor", CONF_DEVICE_CLASS): BinarySensorDeviceClass,
+}
+_AUTO = ""  # empty selection means "keep deriving it automatically"
+
+
+def _class_selector(enum_cls: type) -> SelectSelector:
+    """A dropdown of an HA enum's values, plus an explicit "auto" choice."""
+    options = [SelectOptionDict(value=_AUTO, label="Auto")]
+    options += [
+        SelectOptionDict(value=member.value, label=member.value)
+        for member in enum_cls
+    ]
+    return SelectSelector(
+        SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN)
+    )
+
+
+_FIELD_LABEL = {
+    CONF_DEVICE_CLASS: "device class",
+    CONF_STATE_CLASS: "state class",
+    CONF_UNIT_OVERRIDE: "unit",
+}
+
+
+def _advanced_field_key(item_name: str, conf_key: str) -> str:
+    """Flat per-item field key: options forms can't nest field groups.
+
+    There's no translation for these -- item names are dynamic, so a
+    per-item label can't be pre-declared in strings.json -- so the raw key
+    is what the user sees. Shaped to still read sensibly as a fallback.
+    """
+    return f"{item_name} ({_FIELD_LABEL[conf_key]})"
+
+
+def _advanced_fields(
+    item_name: str, platform: str, current: dict[str, Any]
+) -> dict[Any, Any]:
+    """Optional override fields for one item, for the platform it now has."""
+    fields: dict[Any, Any] = {}
+    for conf_key in ADVANCED_OVERRIDES_FOR.get(platform, frozenset()):
+        default = current.get(conf_key, _AUTO)
+        key = vol.Optional(_advanced_field_key(item_name, conf_key), default=default)
+        if conf_key == CONF_UNIT_OVERRIDE:
+            fields[key] = TextSelector()
+        else:
+            fields[key] = _class_selector(_CLASS_ENUM[(platform, conf_key)])
+    return fields
+
+
+def _apply_advanced_overrides(
+    config: dict[str, Any], item_name: str, user_input: dict[str, Any]
+) -> None:
+    """Write submitted overrides into an item's config, or clear them.
+
+    A blank selection means "auto" -- the derived default -- so it must clear
+    a previously-set override rather than write an empty string.
+    """
+    for conf_key in (CONF_DEVICE_CLASS, CONF_STATE_CLASS, CONF_UNIT_OVERRIDE):
+        field_key = _advanced_field_key(item_name, conf_key)
+        if field_key not in user_input:
+            continue
+        value = (user_input[field_key] or "").strip()
+        if value:
+            config[conf_key] = value
+        else:
+            config.pop(conf_key, None)
+
+
+def _drop_unsupported_overrides(config: dict[str, Any], platform: str) -> None:
+    """Strip overrides the new platform has no field for.
+
+    Reached when an item's platform is changed away from one that supported
+    an override it had set -- e.g. sensor's state_class has no meaning once
+    the item becomes a switch. Left in place, a stale override would sit
+    invisibly in the options until the next edit touched it.
+    """
+    supported = ADVANCED_OVERRIDES_FOR.get(platform, frozenset())
+    for conf_key in (CONF_DEVICE_CLASS, CONF_STATE_CLASS, CONF_UNIT_OVERRIDE):
+        if conf_key not in supported:
+            config.pop(conf_key, None)
 
 
 class OpenHabConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -195,6 +292,7 @@ class OpenHabOptionsFlow(OptionsFlow):
         """Nothing to carry across until a branch is chosen."""
         self._items: list[OpenHabItem] = []
         self._pending_names: list[str] = []
+        self._pending_items: dict[str, dict[str, Any]] = {}
         self._editing: str | None = None
 
     @property
@@ -271,6 +369,12 @@ class OpenHabOptionsFlow(OptionsFlow):
             items = self._configured
             for name in self._pending_names:
                 items[name] = {CONF_PLATFORM: user_input[name]}
+            self._pending_items = items
+            if any(
+                items[name][CONF_PLATFORM] in ADVANCED_OVERRIDES_FOR
+                for name in self._pending_names
+            ):
+                return await self.async_step_add_advanced()
             return self._save(items)
 
         schema: dict[Any, Any] = {}
@@ -282,6 +386,29 @@ class OpenHabOptionsFlow(OptionsFlow):
             schema[vol.Required(name, default=default.value)] = _platform_selector(item)
 
         return self.async_show_form(step_id="add_types", data_schema=vol.Schema(schema))
+
+    async def async_step_add_advanced(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Optionally override the auto-derived device class, state class or unit."""
+        eligible = [
+            name
+            for name in self._pending_names
+            if self._pending_items[name][CONF_PLATFORM] in ADVANCED_OVERRIDES_FOR
+        ]
+        if user_input is not None:
+            for name in eligible:
+                _apply_advanced_overrides(self._pending_items[name], name, user_input)
+            return self._save(self._pending_items)
+
+        schema: dict[Any, Any] = {}
+        for name in eligible:
+            platform = self._pending_items[name][CONF_PLATFORM]
+            schema.update(_advanced_fields(name, platform, {}))
+
+        return self.async_show_form(
+            step_id=STEP_ADD_ADVANCED, data_schema=vol.Schema(schema)
+        )
 
     # -- edit --------------------------------------------------------------
 
@@ -323,7 +450,11 @@ class OpenHabOptionsFlow(OptionsFlow):
                 config[CONF_NAME_OVERRIDE] = override
             else:
                 config.pop(CONF_NAME_OVERRIDE, None)
+            _drop_unsupported_overrides(config, config[CONF_PLATFORM])
             items[name] = config
+            self._pending_items = items
+            if config[CONF_PLATFORM] in ADVANCED_OVERRIDES_FOR:
+                return await self.async_step_edit_advanced()
             return self._save(items)
 
         if not self._items:
@@ -355,6 +486,30 @@ class OpenHabOptionsFlow(OptionsFlow):
                 "item_type": item.type if item else "unknown",
                 "label": (item.label if item and item.label else name),
             },
+        )
+
+    async def async_step_edit_advanced(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Optionally override the auto-derived device class, state class or unit."""
+        assert self._editing is not None
+        name = self._editing
+        config = self._pending_items[name]
+        platform = config[CONF_PLATFORM]
+
+        if user_input is not None:
+            _apply_advanced_overrides(config, name, user_input)
+            return self._save(self._pending_items)
+
+        # Defaults come from the item's overrides *before* this edit, so a
+        # platform change that keeps the same override keys (sensor to
+        # sensor with a different name override, say) doesn't reset them.
+        current = self._configured.get(name, {})
+        schema = _advanced_fields(name, platform, current)
+        return self.async_show_form(
+            step_id=STEP_EDIT_ADVANCED,
+            data_schema=vol.Schema(schema),
+            description_placeholders={"item": name},
         )
 
     # -- remove ------------------------------------------------------------

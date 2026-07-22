@@ -100,6 +100,11 @@ async def test_options_add_item_keeps_existing(hass, config_entry, items):
         result = await hass.config_entries.options.async_configure(
             result["flow_id"], {"Outdoor_Temp": "sensor"}
         )
+        # sensor has advanced overrides, so this step isn't skipped.
+        assert result["step_id"] == "add_advanced"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
 
     items_config = result["data"][CONF_ITEMS]
     assert items_config["Outdoor_Temp"] == {"platform": "sensor"}
@@ -133,6 +138,12 @@ async def test_options_edit_item_platform_and_name(hass, config_entry, items):
         result = await hass.config_entries.options.async_configure(
             result["flow_id"], {"platform": "binary_sensor", "name": "Cooker Lamp"}
         )
+        # binary_sensor has an advanced override (device class), so this
+        # step isn't skipped.
+        assert result["step_id"] == "edit_advanced"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
 
     config = result["data"][CONF_ITEMS]
     assert config["Kitchen_Light"] == {
@@ -140,6 +151,81 @@ async def test_options_edit_item_platform_and_name(hass, config_entry, items):
         "name": "Cooker Lamp",
     }
     assert config["Garage_Gate"] == {"platform": "switch"}
+
+
+async def test_options_add_item_with_advanced_override(hass, config_entry, items):
+    """A chosen device class and unit are saved; a blank state class is not."""
+    with patch(f"{CLIENT}.async_get_items", return_value=items):
+        result = await hass.config_entries.options.async_init(config_entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_items"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"items": ["Outdoor_Temp"]}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"Outdoor_Temp": "sensor"}
+        )
+        assert result["step_id"] == "add_advanced"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                "Outdoor_Temp (device class)": "temperature",
+                "Outdoor_Temp (state class)": "",
+                "Outdoor_Temp (unit)": "°F",
+            },
+        )
+
+    config = result["data"][CONF_ITEMS]["Outdoor_Temp"]
+    assert config["platform"] == "sensor"
+    assert config["device_class"] == "temperature"
+    assert config["unit_of_measurement"] == "°F"
+    assert "state_class" not in config
+
+
+async def test_options_edit_advanced_override_cleared_on_platform_change(
+    hass, config_entry, items
+):
+    """An override that no longer applies is dropped, not left stale.
+
+    A switch has no device class field at all, so an override set while the
+    item was a binary_sensor must not silently survive the platform change.
+    """
+    with patch(f"{CLIENT}.async_get_items", return_value=items):
+        result = await hass.config_entries.options.async_init(config_entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "edit_item"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"item": "Kitchen_Light"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"platform": "binary_sensor", "name": ""}
+        )
+        assert result["step_id"] == "edit_advanced"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"Kitchen_Light (device class)": "power"}
+        )
+
+    config = result["data"][CONF_ITEMS]["Kitchen_Light"]
+    assert config == {"platform": "binary_sensor", "device_class": "power"}
+
+    # Now edit it back to a switch: the device class override must go away.
+    with patch(f"{CLIENT}.async_get_items", return_value=items):
+        result = await hass.config_entries.options.async_init(config_entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "edit_item"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"item": "Kitchen_Light"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"platform": "switch", "name": ""}
+        )
+        # switch has no advanced overrides, so the step is skipped entirely.
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+
+    assert result["data"][CONF_ITEMS]["Kitchen_Light"] == {"platform": "switch"}
 
 
 async def test_options_connection_settings_keep_items(hass, config_entry, items):

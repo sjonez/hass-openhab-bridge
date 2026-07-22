@@ -8,7 +8,13 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import OH_DIMMER, OH_ROLLERSHUTTER, base_item_type
+from .const import (
+    CONF_DEVICE_CLASS,
+    CONF_UNIT_OVERRIDE,
+    OH_DIMMER,
+    OH_ROLLERSHUTTER,
+    base_item_type,
+)
 from .coordinator import OpenHabCoordinator
 from .entity import OpenHabEntity, unit_from_state
 from .platform_helper import build
@@ -39,10 +45,14 @@ class OpenHabNumber(OpenHabEntity, NumberEntity):
             self._attr_native_max_value = 100
             self._attr_native_step = 1
             self._attr_native_unit_of_measurement = "%"
+        if device_class_override := self.config.get(CONF_DEVICE_CLASS):
+            self._attr_device_class = device_class_override
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """Percentages are fixed; other items carry their unit in the state."""
+        """A configured override, else the auto-derived unit."""
+        if unit_override := self.config.get(CONF_UNIT_OVERRIDE):
+            return unit_override
         if self._base_type in PERCENT_TYPES:
             return "%"
         return unit_from_state(self.coordinator.states.get(self.item_name))

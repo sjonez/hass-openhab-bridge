@@ -242,9 +242,11 @@ async def test_options_flow_add_and_remove(hass, live_items):
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"items": [extra]}
     )
-    await hass.config_entries.options.async_configure(
+    result = await hass.config_entries.options.async_configure(
         result["flow_id"], {extra: "sensor"}
     )
+    # sensor has advanced overrides, so this step isn't skipped.
+    await hass.config_entries.options.async_configure(result["flow_id"], {})
     await hass.async_block_till_done()
 
     assert registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{extra}")

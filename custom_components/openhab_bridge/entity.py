@@ -64,6 +64,11 @@ class OpenHabEntity(Entity):
         return self.coordinator.name_for(self.item_name)
 
     @property
+    def config(self) -> dict[str, Any]:
+        """This item's options entry: platform, name and advanced overrides."""
+        return self.coordinator.configured_items.get(self.item_name, {})
+
+    @property
     def available(self) -> bool:
         """Available while connected and holding a usable openHAB state."""
         return self.coordinator.is_available(self.item_name)

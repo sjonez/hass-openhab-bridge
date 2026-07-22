@@ -129,6 +129,35 @@ Naming decisions:
   removing items never disturbs another entity's unique ID — history, dashboards and
   automations survive edits.
 
+### Device class, state class and unit overrides
+
+`sensor.py`/`number.py` derive device class, state class and unit automatically from
+the openHAB dimension (`Number:Temperature` → °C, `SensorDeviceClass.TEMPERATURE`,
+`measurement`). That default is correct for most items, so it is never *replaced* by a
+config step users must go through — instead, `ADVANCED_OVERRIDES_FOR` in `const.py`
+gates an **optional** step (`add_advanced`/`edit_advanced` in `config_flow.py`) that
+only appears for platforms that have something to override, pre-filled with "Auto".
+
+Two things worth keeping straight:
+
+- **Which keys are supported is per-platform, not per-item.** `binary_sensor` has no
+  unit or state class; `number` has no state class (`NumberEntity` doesn't carry the
+  concept); `sensor` supports all three. `ADVANCED_OVERRIDES_FOR` is the single source
+  of truth both flow steps and `_drop_unsupported_overrides` read from.
+- **A stale override is actively cleared, not just ignored.** If an item's platform
+  changes to one that doesn't support a key it had set (e.g. `sensor` → `switch`),
+  `_drop_unsupported_overrides` removes it at save time. Leaving it in the options dict
+  unused would make a later switch back to `sensor` silently resurrect a value the user
+  never re-confirmed.
+
+The override always wins over the derived guess: each entity applies its own
+auto-derivation first, then applies `self.config.get(CONF_DEVICE_CLASS)` (etc.)
+unconditionally afterward, in `__init__` for device/state class and in
+`native_unit_of_measurement` for the unit. This is deliberately unconditional rather
+than "only if the base type doesn't already have an answer" — a user who sets a
+device class override presumably has a specific reason, even for a type that already
+derives one.
+
 ---
 
 ## 5. Loop and echo safety

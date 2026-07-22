@@ -19,6 +19,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_DEVICE_CLASS,
+    CONF_STATE_CLASS,
+    CONF_UNIT_OVERRIDE,
     DOMAIN,
     OH_DATETIME,
     OH_NUMBER,
@@ -104,9 +107,19 @@ class OpenHabSensor(OpenHabEntity, SensorEntity):
             else:
                 self._attr_state_class = SensorStateClass.MEASUREMENT
 
+        # A user-chosen override always wins over the auto-derived guess --
+        # set last, and unconditionally, so it applies even to item types the
+        # auto-derivation above doesn't touch at all (e.g. a plain String).
+        if device_class_override := self.config.get(CONF_DEVICE_CLASS):
+            self._attr_device_class = device_class_override
+        if state_class_override := self.config.get(CONF_STATE_CLASS):
+            self._attr_state_class = state_class_override
+
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """openHAB carries the unit in the state, e.g. ``21.5 °C``."""
+        """A configured override, else the unit openHAB carries in the state."""
+        if unit_override := self.config.get(CONF_UNIT_OVERRIDE):
+            return unit_override
         if self._base_type != OH_NUMBER:
             return None
         return unit_from_state(self.coordinator.states.get(self.item_name))

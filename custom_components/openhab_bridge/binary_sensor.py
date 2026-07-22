@@ -15,7 +15,7 @@ from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import CONF_DEVICE_CLASS, DOMAIN
 from .coordinator import OpenHabCoordinator
 from .diagnostic_entity import OpenHabDiagnosticEntity
 from .entity import OpenHabEntity
@@ -52,6 +52,8 @@ class OpenHabBinarySensor(OpenHabEntity, BinarySensorEntity):
         item = coordinator.items.get(item_name)
         if item and item.type == "Contact":
             self._attr_device_class = BinarySensorDeviceClass.OPENING
+        if device_class_override := self.config.get(CONF_DEVICE_CLASS):
+            self._attr_device_class = device_class_override
 
     @property
     def is_on(self) -> bool | None:

@@ -54,6 +54,11 @@
         "description": "Each item is pre-set to the closest matching entity type. Change any you would like to expose differently.",
         "data": {}
       },
+      "add_advanced": {
+        "title": "Advanced (optional)",
+        "description": "Device class, state class and unit are normally derived automatically from the openHAB item type. Leave any of these on “Auto” to keep that; only set one if you need something different.",
+        "data": {}
+      },
       "edit_item": {
         "title": "Edit an item",
         "description": "Choose which exposed item to change.",
@@ -68,6 +73,11 @@
           "platform": "Entity type",
           "name": "Name override"
         }
+      },
+      "edit_advanced": {
+        "title": "Advanced: {item}",
+        "description": "Device class, state class and unit are normally derived automatically from the openHAB item type. Leave any of these on “Auto” to keep that.",
+        "data": {}
       },
       "remove_items": {
         "title": "Remove items",

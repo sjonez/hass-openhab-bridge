@@ -17,12 +17,31 @@ CONF_VERIFY_SSL: Final = "verify_ssl"
 CONF_ITEMS: Final = "items"
 CONF_PLATFORM: Final = "platform"
 CONF_NAME_OVERRIDE: Final = "name"
+# Optional per-item overrides of the auto-derived sensor/number attributes.
+# Absent means "keep deriving it automatically" -- see ADVANCED_OVERRIDES_FOR.
+CONF_DEVICE_CLASS: Final = "device_class"
+CONF_STATE_CLASS: Final = "state_class"
+CONF_UNIT_OVERRIDE: Final = "unit_of_measurement"
 
 # Options flow menu steps
 STEP_ADD_ITEMS: Final = "add_items"
+STEP_ADD_ADVANCED: Final = "add_advanced"
 STEP_EDIT_ITEM: Final = "edit_item"
+STEP_EDIT_ADVANCED: Final = "edit_advanced"
 STEP_REMOVE_ITEMS: Final = "remove_items"
 STEP_CONNECTION: Final = "connection"
+
+# Which advanced overrides make sense for each platform. binary_sensor has no
+# unit or state class; number has no state class (NumberEntity doesn't carry
+# one); sensor supports all three. Platforms not listed get no advanced step
+# at all -- there's nothing to override for a switch or a light.
+ADVANCED_OVERRIDES_FOR: Final[dict[str, frozenset[str]]] = {
+    Platform.SENSOR.value: frozenset(
+        {CONF_DEVICE_CLASS, CONF_STATE_CLASS, CONF_UNIT_OVERRIDE}
+    ),
+    Platform.NUMBER.value: frozenset({CONF_DEVICE_CLASS, CONF_UNIT_OVERRIDE}),
+    Platform.BINARY_SENSOR.value: frozenset({CONF_DEVICE_CLASS}),
+}
 
 # Dispatcher signals
 SIGNAL_STATE_UPDATED: Final = f"{DOMAIN}_state_{{}}_{{}}"

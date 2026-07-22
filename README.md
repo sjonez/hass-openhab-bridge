@@ -46,6 +46,18 @@ Open **Configure** on the integration to reach a menu:
 Items are identified by their openHAB item name, so adding or removing one never disturbs the
 others' entity IDs, history or automations.
 
+### Advanced: device class, state class and unit
+
+For `sensor`, `number` and `binary_sensor` entities, adding or editing an item shows an extra
+step for overriding the device class (all three platforms), state class (`sensor` only) and unit
+of measurement (`sensor` and `number`). These are normally derived automatically from the
+openHAB item type — a `Number:Temperature` item becomes a temperature sensor in °C without any
+input from you — so leave a field on **Auto** unless you need something different, for example
+a `Number` item with no dimension metadata, or a device class that doesn't match the dimension.
+
+If you later change an item's entity type to one that doesn't support an override it had set —
+say, from `sensor` back to `switch` — that override is dropped rather than left sitting unused.
+
 ## Naming
 
 - Entity IDs are prefixed: `switch.openhab_kitchen_light`, `sensor.openhab_outdoor_temperature`.
