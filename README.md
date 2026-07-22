@@ -18,25 +18,6 @@ and the connection is re-established automatically if it drops.
 - Subscriptions are **per item**, server-side, so a large openHAB install does not push
   thousands of irrelevant events at Home Assistant.
 
-## Integration icon
-
-Home Assistant does not read an icon from the integration itself — there is no manifest field
-for it. Integration logos are served from `brands.home-assistant.io`, backed by the
-[home-assistant/brands](https://github.com/home-assistant/brands) repository, which has a
-`custom_integrations/` directory for exactly this case.
-
-Until an entry exists there, Home Assistant shows an "icon not available" placeholder. To fix
-it, open a PR on that repo adding:
-
-```
-custom_integrations/openhab_bridge/icon.png     # 256x256, square, transparent
-custom_integrations/openhab_bridge/logo.png     # optional, wider wordmark
-```
-
-The openHAB logo is the openHAB Foundation's trademark. Using a vendor's logo for the
-integration that talks to it is the established convention across Home Assistant, but the
-submission has to come from you, and the brands repo has its own review and sizing rules.
-
 ## Requirements
 
 - openHAB 4.0 or newer (the `/ws/events` endpoint is required; there is no polling fallback).
