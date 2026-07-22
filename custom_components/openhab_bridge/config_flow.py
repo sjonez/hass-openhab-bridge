@@ -149,24 +149,31 @@ _FIELD_LABEL = {
 }
 
 
-def _advanced_field_key(item_name: str, conf_key: str) -> str:
-    """Flat per-item field key: options forms can't nest field groups.
+def _advanced_field_key(item_name: str, conf_key: str, *, single: bool) -> str:
+    """The vol key an override field is submitted under.
 
-    There's no translation for these -- item names are dynamic, so a
-    per-item label can't be pre-declared in strings.json -- so the raw key
-    is what the user sees. Shaped to still read sensibly as a fallback.
+    When only one item is on the form -- always true for an edit, and true
+    for an add of a single item, which covers the overwhelming majority of
+    uses -- the plain config key is used, so it picks up the real translated
+    label in strings.json. Adding several items at once still needs each
+    field disambiguated by item name; there's no translation for that,
+    since item names are dynamic, so the raw key is what's shown -- worse,
+    but only reached on a multi-item add.
     """
+    if single:
+        return conf_key
     return f"{item_name} ({_FIELD_LABEL[conf_key]})"
 
 
 def _advanced_fields(
-    item_name: str, platform: str, current: dict[str, Any]
+    item_name: str, platform: str, current: dict[str, Any], *, single: bool
 ) -> dict[Any, Any]:
     """Optional override fields for one item, for the platform it now has."""
     fields: dict[Any, Any] = {}
     for conf_key in ADVANCED_OVERRIDES_FOR.get(platform, frozenset()):
         default = current.get(conf_key, _AUTO)
-        key = vol.Optional(_advanced_field_key(item_name, conf_key), default=default)
+        field_key = _advanced_field_key(item_name, conf_key, single=single)
+        key = vol.Optional(field_key, default=default)
         if conf_key == CONF_UNIT_OVERRIDE:
             fields[key] = TextSelector()
         else:
@@ -175,7 +182,7 @@ def _advanced_fields(
 
 
 def _apply_advanced_overrides(
-    config: dict[str, Any], item_name: str, user_input: dict[str, Any]
+    config: dict[str, Any], item_name: str, user_input: dict[str, Any], *, single: bool
 ) -> None:
     """Write submitted overrides into an item's config, or clear them.
 
@@ -183,7 +190,7 @@ def _apply_advanced_overrides(
     a previously-set override rather than write an empty string.
     """
     for conf_key in (CONF_DEVICE_CLASS, CONF_STATE_CLASS, CONF_UNIT_OVERRIDE):
-        field_key = _advanced_field_key(item_name, conf_key)
+        field_key = _advanced_field_key(item_name, conf_key, single=single)
         if field_key not in user_input:
             continue
         value = (user_input[field_key] or "").strip()
@@ -396,15 +403,19 @@ class OpenHabOptionsFlow(OptionsFlow):
             for name in self._pending_names
             if self._pending_items[name][CONF_PLATFORM] in ADVANCED_OVERRIDES_FOR
         ]
+        single = len(eligible) == 1
+
         if user_input is not None:
             for name in eligible:
-                _apply_advanced_overrides(self._pending_items[name], name, user_input)
+                _apply_advanced_overrides(
+                    self._pending_items[name], name, user_input, single=single
+                )
             return self._save(self._pending_items)
 
         schema: dict[Any, Any] = {}
         for name in eligible:
             platform = self._pending_items[name][CONF_PLATFORM]
-            schema.update(_advanced_fields(name, platform, {}))
+            schema.update(_advanced_fields(name, platform, {}, single=single))
 
         return self.async_show_form(
             step_id=STEP_ADD_ADVANCED, data_schema=vol.Schema(schema)
@@ -498,14 +509,14 @@ class OpenHabOptionsFlow(OptionsFlow):
         platform = config[CONF_PLATFORM]
 
         if user_input is not None:
-            _apply_advanced_overrides(config, name, user_input)
+            _apply_advanced_overrides(config, name, user_input, single=True)
             return self._save(self._pending_items)
 
         # Defaults come from the item's overrides *before* this edit, so a
         # platform change that keeps the same override keys (sensor to
         # sensor with a different name override, say) doesn't reset them.
         current = self._configured.get(name, {})
-        schema = _advanced_fields(name, platform, current)
+        schema = _advanced_fields(name, platform, current, single=True)
         return self.async_show_form(
             step_id=STEP_EDIT_ADVANCED,
             data_schema=vol.Schema(schema),

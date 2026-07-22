@@ -56,8 +56,12 @@
       },
       "add_advanced": {
         "title": "Advanced (optional)",
-        "description": "Device class, state class and unit are normally derived automatically from the openHAB item type. Leave any of these on “Auto” to keep that; only set one if you need something different.",
-        "data": {}
+        "description": "Device class, state class and unit are normally derived automatically from the openHAB item type. Leave any of these on “Auto” to keep that; only set one if you need something different. Adding several items at once, each field is labelled with the item it belongs to.",
+        "data": {
+          "device_class": "Device class",
+          "state_class": "State class",
+          "unit_of_measurement": "Unit of measurement"
+        }
       },
       "edit_item": {
         "title": "Edit an item",
@@ -77,7 +81,11 @@
       "edit_advanced": {
         "title": "Advanced: {item}",
         "description": "Device class, state class and unit are normally derived automatically from the openHAB item type. Leave any of these on “Auto” to keep that.",
-        "data": {}
+        "data": {
+          "device_class": "Device class",
+          "state_class": "State class",
+          "unit_of_measurement": "Unit of measurement"
+        }
       },
       "remove_items": {
         "title": "Remove items",

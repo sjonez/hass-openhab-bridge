@@ -167,12 +167,14 @@ async def test_options_add_item_with_advanced_override(hass, config_entry, items
             result["flow_id"], {"Outdoor_Temp": "sensor"}
         )
         assert result["step_id"] == "add_advanced"
+        # A single item's advanced fields use plain, translated keys --
+        # only a multi-item add needs the item name to disambiguate.
         result = await hass.config_entries.options.async_configure(
             result["flow_id"],
             {
-                "Outdoor_Temp (device class)": "temperature",
-                "Outdoor_Temp (state class)": "",
-                "Outdoor_Temp (unit)": "°F",
+                "device_class": "temperature",
+                "state_class": "",
+                "unit_of_measurement": "°F",
             },
         )
 
@@ -181,6 +183,35 @@ async def test_options_add_item_with_advanced_override(hass, config_entry, items
     assert config["device_class"] == "temperature"
     assert config["unit_of_measurement"] == "°F"
     assert "state_class" not in config
+
+
+async def test_options_add_multiple_items_with_advanced_overrides(
+    hass, config_entry, items
+):
+    """Adding several items at once disambiguates each field by item name."""
+    with patch(f"{CLIENT}.async_get_items", return_value=items):
+        result = await hass.config_entries.options.async_init(config_entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_items"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"items": ["Outdoor_Temp", "No_Label"]}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"Outdoor_Temp": "sensor", "No_Label": "sensor"}
+        )
+        assert result["step_id"] == "add_advanced"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                "Outdoor_Temp (device class)": "humidity",
+                "No_Label (unit)": "kg",
+            },
+        )
+
+    config = result["data"][CONF_ITEMS]
+    assert config["Outdoor_Temp"]["device_class"] == "humidity"
+    assert config["No_Label"]["unit_of_measurement"] == "kg"
 
 
 async def test_options_edit_advanced_override_cleared_on_platform_change(
@@ -204,7 +235,7 @@ async def test_options_edit_advanced_override_cleared_on_platform_change(
         )
         assert result["step_id"] == "edit_advanced"
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"Kitchen_Light (device class)": "power"}
+            result["flow_id"], {"device_class": "power"}
         )
 
     config = result["data"][CONF_ITEMS]["Kitchen_Light"]
