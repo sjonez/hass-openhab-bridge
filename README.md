@@ -106,20 +106,21 @@ will appear to do nothing if the device did not actually act. When that happens:
 - the **Unconfirmed commands** diagnostic sensor counts it;
 - after three in a row, a repair is raised pointing at the likely offline thing.
 
-Commands to these items are also exempt from redundant-write suppression, so re-sending a value
-the item already reads (a gate that reads `ON`, say) is passed through rather than swallowed.
-
 ## Loop safety
 
 An HA write becomes an openHAB command, which becomes a state change, which updates the HA
 entity. That round trip terminates by design: inbound events only ever write entity state, and
 writing entity state never issues a command.
 
+Commands are never suppressed for matching the state openHAB last reported — a real device can
+drift out of sync with what openHAB thinks it holds, so re-sending a value the item already
+reads (a switch OH thinks is already `ON`, say) always reaches openHAB, for every item.
+
 The remaining risk is a loop built *outside* this integration — an HA automation that commands an
 item whenever it changes, or an openHAB rule doing the same. The integration will not amplify it:
-redundant writes are skipped, and if an item is commanded repeatedly in a short window, outbound
-commands to it are paused, the **Feedback loop detected** diagnostic turns on, and a
-repair names the item. Inbound state keeps working throughout.
+if an item is commanded repeatedly in a short window, outbound commands to it are paused, the
+**Feedback loop detected** diagnostic turns on, and a repair names the item. Inbound state keeps
+working throughout.
 
 ## Triggering on commands and changes
 

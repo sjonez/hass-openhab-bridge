@@ -416,20 +416,14 @@ class OpenHabCoordinator:
             repairs.async_clear_feedback_loop(self.hass, self.entry, name)
             self._notify_connection()
 
-        # Rule 1: skip redundant writes -- but NOT for autoupdate=false items,
-        # where the cached state reflects the device rather than the last
-        # command, so re-sending a value the item already reads is legitimate.
-        #
-        # Compare against any in-flight command rather than the cached state:
-        # we never update state optimistically, so after sending ON the cache
-        # still reads OFF. Comparing against the cache would treat a rapid
-        # ON-then-OFF as redundant and silently drop the OFF.
-        pending = self._pending.get(name)
-        current = pending.value if pending is not None else self.states.get(name)
-        if self.autoupdate(name) and current == command:
-            _LOGGER.debug("Skipping no-op command %s -> %s", name, command)
-            return
-
+        # No redundant-write suppression: a command that matches the cached
+        # state is still sent. Real devices drift out of sync with what
+        # openHAB last reported -- a switch OH thinks is already ON may be
+        # physically off -- and a user re-sending ON must reach the device
+        # regardless. Loop safety against a genuine runaway (an automation
+        # or openHAB rule re-triggering on every echo) rests entirely on the
+        # oscillation detector below, which bounds the damage without ever
+        # silently dropping a command a user asked for.
         if self._record_write(guard, now, command):
             self.looping_items.add(name)
             guard.suppressed_until = now + OSCILLATION_COOLDOWN

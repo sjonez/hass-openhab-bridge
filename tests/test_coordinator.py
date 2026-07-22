@@ -89,25 +89,30 @@ async def test_inbound_event_never_writes_back(hass, config_entry, mock_client):
     assert mock_client.async_post_update.call_count == 0
 
 
-async def test_no_op_command_is_skipped(hass, config_entry, mock_client):
-    """Commanding an autoupdate item to the value it already has is redundant."""
+async def test_command_matching_current_state_is_still_sent(
+    hass, config_entry, mock_client
+):
+    """A command is never suppressed for matching the cached state.
+
+    Real devices drift out of sync with what openHAB last reported, so a
+    user re-sending a value the item already reads must still reach
+    openHAB -- for every item, not just ones with autoupdate disabled. Loop
+    safety against a genuine runaway rests entirely on the oscillation
+    detector, not on dropping commands a user asked for.
+    """
     coordinator = await _coordinator(hass, config_entry, mock_client)
     assert coordinator.states["Kitchen_Light"] == "OFF"
 
     await coordinator.async_send_command("Kitchen_Light", "OFF")
-    assert mock_client.commands == []
-
-    await coordinator.async_send_command("Kitchen_Light", "ON")
-    assert mock_client.commands == [("Kitchen_Light", "ON")]
+    assert mock_client.commands == [("Kitchen_Light", "OFF")]
 
 
-async def test_rapid_toggle_is_not_treated_as_a_no_op(hass, config_entry, mock_client):
-    """Regression: state is never updated optimistically.
+async def test_rapid_toggle_reaches_openhab_in_order(hass, config_entry, mock_client):
+    """A quick ON-then-OFF is just two ordinary commands.
 
-    After sending ON the cache still reads OFF, because we wait for openHAB to
-    confirm. Comparing a new command against the cache rather than the
-    in-flight one made a quick ON-then-OFF look redundant, and the OFF was
-    silently dropped -- leaving the device on.
+    State is never updated optimistically. Neither command is compared
+    against the other or against the cache, and both reach openHAB in the
+    order they were sent.
     """
     coordinator = await _coordinator(hass, config_entry, mock_client)
     assert coordinator.states["Kitchen_Light"] == "OFF"
@@ -121,32 +126,23 @@ async def test_rapid_toggle_is_not_treated_as_a_no_op(hass, config_entry, mock_c
     ]
 
 
-async def test_duplicate_of_inflight_command_is_skipped(
+async def test_duplicate_of_inflight_command_is_still_sent(
     hass, config_entry, mock_client
 ):
-    """Re-sending the command already in flight is still redundant."""
-    coordinator = await _coordinator(hass, config_entry, mock_client)
+    """Re-sending the same command already in flight also reaches openHAB.
 
-    await coordinator.async_send_command("Kitchen_Light", "ON")
-    await coordinator.async_send_command("Kitchen_Light", "ON")
-
-    assert mock_client.commands == [("Kitchen_Light", "ON")]
-
-
-async def test_no_op_not_skipped_when_autoupdate_disabled(
-    hass, config_entry, mock_client
-):
-    """For autoupdate=false items the state reflects the device, not the command.
-
-    Re-sending a value the item already reads is legitimate, so suppression
-    must not swallow it.
+    A user may need to force a retry precisely because the first command
+    didn't take effect, so this must not be treated as redundant either.
     """
     coordinator = await _coordinator(hass, config_entry, mock_client)
-    assert coordinator.states["Garage_Gate"] == "OFF"
-    assert coordinator.autoupdate("Garage_Gate") is False
 
-    await coordinator.async_send_command("Garage_Gate", "OFF")
-    assert mock_client.commands == [("Garage_Gate", "OFF")]
+    await coordinator.async_send_command("Kitchen_Light", "ON")
+    await coordinator.async_send_command("Kitchen_Light", "ON")
+
+    assert mock_client.commands == [
+        ("Kitchen_Light", "ON"),
+        ("Kitchen_Light", "ON"),
+    ]
 
 
 async def test_stale_echo_is_dropped(hass, config_entry, mock_client):

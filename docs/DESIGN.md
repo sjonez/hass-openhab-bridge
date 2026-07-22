@@ -171,25 +171,33 @@ calls (`async_turn_on`, …); the inbound handler only ever calls
 echo dies on arrival. This is a design invariant, and a test asserts that handling an
 inbound event issues **zero** HTTP requests.
 
-Four layers sit on top, in `coordinator.py`:
+Three layers sit on top, in `coordinator.py`:
 
-1. **No-op suppression.** Skip a write whose value already equals the current state.
-   The subtlety, and a bug found by the unit tests: the comparison must be against the
-   **in-flight pending command**, not the state cache. Comparing against the cache made
-   a rapid double-toggle silently drop the second command, because the cache still held
-   the pre-first-command value.
-2. **Pending-write tracking.** `(item → expected value, seq, timestamp)`, letting us
+1. **Pending-write tracking.** `(item → expected value, seq, timestamp)`, letting us
    tell *our* echo from a genuine external change, and letting bus events carry
    `origin: home_assistant`.
-3. **Stale-echo rejection.** A fast double-toggle can deliver command #1's echo after
+2. **Stale-echo rejection.** A fast double-toggle can deliver command #1's echo after
    command #2 was sent. Echoes matching a superseded write are dropped rather than
    flipping the UI backwards. Capped at `MAX_SUPERSEDED = 4` — an early unbounded
    version swallowed genuine events.
-4. **Oscillation detector.** The one way to build a true infinite loop is *outside* this
+3. **Oscillation detector.** The one way to build a true infinite loop is *outside* this
    integration — a user automation, or a mirroring rule in openHAB. We cannot prevent
    that, but we refuse to be the amplifier: >10 writes in 30 s for one item stops
    outbound writes for that item for 60 s and lights the "Feedback loop detected"
    diagnostic. Inbound state keeps flowing throughout; only the outbound leg breaks.
+
+**No redundant-write suppression.** An earlier version skipped a write whose value
+already equalled the cached state, on the theory that it couldn't matter — until real
+usage showed real devices drift out of sync with what openHAB last reported (a switch
+OH thinks is already `ON` may be physically off), and a user re-sending `ON` needs it
+to reach the device regardless. That suppression is gone entirely; loop safety rests
+solely on the oscillation detector above, which bounds a genuine runaway without ever
+silently dropping a command a user asked for. (An earlier iteration of this same
+suppression had its own bug, since fixed then removed along with the rest of it: it
+compared a new command against the **state cache** rather than any **in-flight
+pending command**, so a rapid double-toggle silently dropped the second command — the
+cache still held the pre-first-command value, since state is never updated
+optimistically.)
 
 **Deliberately not used:** openHAB's WebSocket `source` filter. The
 `ItemStateChangedEvent` produced downstream of a REST command does not reliably carry
@@ -200,19 +208,18 @@ our client's source, so filtering on it would drop the very confirmations we dep
 ## 6. Items with `autoupdate="false"`
 
 With `autoupdate="false"` a command does not change item state — only an explicit
-update or a binding report does. §1 already handles the sync problem; three specific
-adjustments remain:
+update or a binding report does. §1 already handles the sync problem; one specific
+adjustment remains:
 
 1. **Detected per item** from the metadata query, refreshed on every resync.
-2. **Exempt from no-op suppression.** This contradicts layer 1 of §5, and the exemption
-   wins. For these items the cached state reflects *the device*, not the last command,
-   so "requested equals current" does not mean redundant — re-sending `ON` to a gate
-   that reads `ON` is legitimate and often necessary. Loop safety here rests on the
-   oscillation detector alone.
-3. **Longer, louder pending window.** `PENDING_TIMEOUT_NO_AUTOUPDATE = 60 s` versus 5 s.
+2. **Longer, louder pending window.** `PENDING_TIMEOUT_NO_AUTOUPDATE = 60 s` versus 5 s.
    Expiry is not silent: it increments a diagnostic counter, logs the item and command,
    and fires `openhab_bridge_command_unconfirmed` so automations can retry or alert.
    State is still resynced from REST at expiry.
+
+These items no longer need an exemption from no-op suppression — see §5 — since that
+suppression doesn't exist for any item anymore. `autoupdate()` still gates which
+pending-window duration applies (this section) and nothing else.
 
 ---
 
