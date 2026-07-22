@@ -266,6 +266,11 @@ prompt.
 
 ## Development
 
+[`docs/DESIGN.md`](docs/DESIGN.md) records why the integration is built the way it is —
+the openHAB protocol facts that were established empirically, the loop-safety layers,
+and the decisions that look arbitrary without their reasoning. Read it before changing
+event handling, the write path, or the repair flows.
+
 Requires Python 3.13 (Home Assistant's minimum).
 
 ```bash
