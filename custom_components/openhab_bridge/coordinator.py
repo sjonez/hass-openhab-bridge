@@ -49,6 +49,7 @@ from .const import (
     PENDING_TIMEOUT,
     PENDING_TIMEOUT_NO_AUTOUPDATE,
     SIGNAL_CONNECTION,
+    SIGNAL_LAST_EVENT,
     SIGNAL_STATE_UPDATED,
     UNCONFIRMED_REPAIR_THRESHOLD,
     UNUSABLE_STATES,
@@ -243,6 +244,11 @@ class OpenHabCoordinator:
         name = event.item_name
         if name is None:
             return
+
+        # Fired for every event regardless of item, so the "Last event"
+        # diagnostic reflects the whole bus -- not just exposed items -- and
+        # can actually reveal a silently dead socket.
+        async_dispatcher_send(self.hass, SIGNAL_LAST_EVENT.format(self.entry.entry_id))
 
         if event.type == "ItemRemovedEvent":
             if name in self.configured_items:

@@ -246,9 +246,17 @@ cover a command that changed nothing, which is exactly the gap this fills.
 Six diagnostic entities per config entry: Connected, Last connected, Reconnect
 attempts, Last event, Feedback loop detected, Unconfirmed commands.
 
-"Last event" needs `_attr_should_poll = True` with a 5-minute `SCAN_INTERVAL` —
-diagnostics otherwise only re-render on connect/disconnect, so the timestamp appeared
-frozen.
+The other five diagnostics need `_attr_should_poll = True` with a 5-minute
+`SCAN_INTERVAL` — they otherwise only re-render on connect/disconnect, so a stat like
+Reconnect attempts would sit stale between events.
+
+"Last event" is the one exception: it overrides `should_poll = False` and pushes on
+`SIGNAL_LAST_EVENT`, dispatched from `coordinator._handle_event` on **every** openHAB
+event — including ones for items this integration doesn't expose, since its whole job
+is to prove the socket isn't silently dead, and a filtered signal couldn't do that. An
+earlier version polled it every 5 minutes to avoid recorder bloat; that trade-off is
+gone now that users are expected to exclude it from the recorder (below), so there's no
+longer a reason for it to lag reality.
 
 **Recorder exclusion is not possible from integration code.** Recorder filtering comes
 only from `entity_filter` in `configuration.yaml`; there is no integration-side API.

@@ -198,15 +198,14 @@ something happened, but nothing changed.
 
 ## Recorder / history
 
-Of the diagnostic entities, only **Last event** changes regularly — it tracks the
-most recent openHAB event, so on a busy server it moves constantly. The others
-(Last connected, Reconnect attempts, Unconfirmed commands, Connected, Feedback loop detected)
-only change when something actually happens, so they cost almost nothing.
+Of the diagnostic entities, only **Last event** changes regularly — it updates on every
+openHAB event, so on a busy server it moves constantly (this user's ~2,900-item instance
+sees roughly 15 events/second). The others (Last connected, Reconnect attempts,
+Unconfirmed commands, Connected, Feedback loop detected) only change when something
+actually happens, so they cost almost nothing.
 
-The diagnostics are polled every 5 minutes rather than the usual 30 seconds, which keeps
-Last event to roughly 290 recorder rows a day instead of ~2,900. If you want none at all,
-Home Assistant only supports this in `configuration.yaml` — there is no way for an
-integration to exclude its own entities:
+If you don't want that history, Home Assistant only supports excluding it in
+`configuration.yaml` — there is no way for an integration to exclude its own entities:
 
 ```yaml
 recorder:

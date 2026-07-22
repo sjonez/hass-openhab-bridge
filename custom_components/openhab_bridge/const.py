@@ -27,6 +27,7 @@ STEP_CONNECTION: Final = "connection"
 # Dispatcher signals
 SIGNAL_STATE_UPDATED: Final = f"{DOMAIN}_state_{{}}_{{}}"
 SIGNAL_CONNECTION: Final = f"{DOMAIN}_connection_{{}}"
+SIGNAL_LAST_EVENT: Final = f"{DOMAIN}_last_event_{{}}"
 
 # Events fired on the HA bus
 EVENT_COMMAND_UNCONFIRMED: Final = f"{DOMAIN}_command_unconfirmed"

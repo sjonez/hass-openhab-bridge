@@ -14,20 +14,28 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, OH_DATETIME, OH_NUMBER, base_item_type, item_dimension
+from .const import (
+    DOMAIN,
+    OH_DATETIME,
+    OH_NUMBER,
+    SIGNAL_LAST_EVENT,
+    base_item_type,
+    item_dimension,
+)
 from .coordinator import OpenHabCoordinator
 from .diagnostic_entity import OpenHabDiagnosticEntity
 from .entity import OpenHabEntity, unit_from_state
 from .platform_helper import build
 
 # Only the diagnostic entities poll; item entities are pushed and set
-# should_poll = False, so this interval applies solely to them. "Last event"
-# would otherwise write a new state every 30s forever, since openHAB events
-# arrive constantly -- roughly 2,900 recorder rows a day for a value nobody
-# needs history of. Five minutes is ample to spot a stalled stream.
+# should_poll = False, so this interval applies to the diagnostics that don't
+# override should_poll themselves. "Last event" pushes on every openHAB event
+# instead (see OpenHabLastEventSensor) -- it's meant to be excluded from the
+# recorder (see the README), so updating it on every event costs no history.
 SCAN_INTERVAL = timedelta(minutes=5)
 
 # openHAB dimensions that map cleanly onto an HA device class.
@@ -144,10 +152,26 @@ class OpenHabLastEventSensor(OpenHabDiagnosticEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    # Pushed on every event via SIGNAL_LAST_EVENT instead of polled -- unlike
+    # the other diagnostics, it changes far too often for a 5-minute poll to
+    # be anything but misleading, and there's no recorder cost to updating it
+    # live since users are expected to exclude it (see the README).
+    _attr_should_poll = False
 
     def __init__(self, coordinator: OpenHabCoordinator) -> None:
         """Initialise the last-event diagnostic."""
         super().__init__(coordinator, "last_event", "Last event", ENTITY_ID_FORMAT)
+
+    async def async_added_to_hass(self) -> None:
+        """Refresh on connection changes and on every openHAB event."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                SIGNAL_LAST_EVENT.format(self.coordinator.entry.entry_id),
+                self._handle_update,
+            )
+        )
 
     @property
     def native_value(self) -> datetime | None:

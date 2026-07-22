@@ -7,6 +7,7 @@ from datetime import timedelta
 import pytest
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
     async_capture_events,
@@ -18,6 +19,7 @@ from custom_components.openhab_bridge.const import (
     EVENT_COMMAND_UNCONFIRMED,
     EVENT_ITEM_EVENT,
     OSCILLATION_THRESHOLD,
+    SIGNAL_LAST_EVENT,
 )
 from custom_components.openhab_bridge.coordinator import OpenHabCoordinator
 from custom_components.openhab_bridge.websocket import OpenHabEvent
@@ -265,6 +267,27 @@ async def test_repeat_update_is_not_an_event(hass, config_entry, mock_client):
 
     assert events == []
     assert coordinator.states["Kitchen_Light"] == "OFF"
+
+
+async def test_every_event_pushes_last_event_signal(hass, config_entry, mock_client):
+    """The "Last event" diagnostic pushes rather than polls.
+
+    It must fire for every event -- including a same-value update, which is
+    not itself reportable on the item bus -- since its whole job is to prove
+    the socket isn't silently dead, for any item, exposed or not.
+    """
+    coordinator = await _coordinator(hass, config_entry, mock_client)
+    signals = []
+    async_dispatcher_connect(
+        hass,
+        SIGNAL_LAST_EVENT.format(config_entry.entry_id),
+        lambda: signals.append(True),
+    )
+
+    coordinator._handle_event(_state_event("Kitchen_Light", "OFF"))
+    await hass.async_block_till_done()
+
+    assert len(signals) == 1
 
 
 async def test_change_is_reported_once_with_the_old_value(
