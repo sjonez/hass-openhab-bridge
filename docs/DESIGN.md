@@ -290,9 +290,16 @@ Other environment notes:
 
 ## 11. Open threads
 
-- **Icon.** No brand submitted. HACS checks `custom_components/{domain}/brand/icon.png`
-  locally *before* falling back to `brands.home-assistant.io` — verified by byte
-  comparison against another HACS integration — so a local file should work without a
-  PR. Untested here.
+- **Icon.** None, and there is **no local mechanism** — do not waste time looking for
+  one. Verified three ways: HACS's own `validate/brands.py` checks only
+  `brands.home-assistant.io/domains.json`; the HACS frontend bundle only ever builds
+  `brands.home-assistant.io` URLs; and HACS integrations that *do* have icons ship no
+  local asset (checked `EuleMitKeule/device-tools`, which is simply registered in that
+  file's `custom` list).
+
+  The route is a PR to `home-assistant/brands` adding `custom_integrations/openhab_bridge/`
+  with `icon.png` (256×256) and `logo.png`. This is independent of submitting the
+  integration to HA core — the `custom` list holds 4,246 domains. Note `openhab` is
+  already taken by an unrelated integration; ours would be `openhab_bridge`.
 - **Production rollout.** Recommended path is 2–3 unimportant items first, watching the
   diagnostics for a day, before exposing anything that matters.
